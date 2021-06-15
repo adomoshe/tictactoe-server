@@ -78,7 +78,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('A user disconnected');
   });
-  // socket.on('todo:create', createTodo);
+  socket.on('play:space', registerMove);
   // socket.on('todo:list', listTodo);
 });
 
