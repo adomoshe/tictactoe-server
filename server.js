@@ -6,6 +6,8 @@ const jwksRsa = require('jwks-rsa');
 const cors = require('cors');
 require('dotenv').config();
 
+const { registerMove, matchGame } = require('./routes/play');
+
 const app = express();
 const server = require('http').createServer(app);
 
@@ -71,15 +73,13 @@ const serverOptions = {
 };
 const io = new Server(server, serverOptions);
 
-// const { createTodo, listTodo } = createTodoHandlers(components);
-
 io.on('connection', (socket) => {
   console.log('A user connected');
   socket.on('disconnect', () => {
     console.log('A user disconnected');
   });
-  socket.on('play:space', registerMove);
-  // socket.on('todo:list', listTodo);
+  socket.on('play:space', (payload) => registerMove(socket, payload));
+  socket.on('joined', (payload) => matchGame(socket, payload));
 });
 
 const port = process.env.PORT || 3001;
