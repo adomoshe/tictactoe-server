@@ -1,5 +1,4 @@
 var express = require('express');
-var secured = require('../middleware/secured');
 var router = express.Router();
 
 /* GET user profile. */
