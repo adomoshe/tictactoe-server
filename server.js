@@ -1,7 +1,6 @@
 const Server = require('socket.io').Server;
 const express = require('express');
 const jwt = require('express-jwt');
-const jwtAuthz = require('express-jwt-authz');
 const jwksRsa = require('jwks-rsa');
 const cors = require('cors');
 require('dotenv').config();
@@ -10,8 +9,6 @@ const { registerMove, matchGame } = require('./routes/play');
 
 const app = express();
 const server = require('http').createServer(app);
-
-// import playHandlers from './routes/play';
 
 if (!process.env.AUTH0_DOMAIN || !process.env.AUTH0_AUDIENCE) {
   throw 'Make sure you have AUTH0_DOMAIN, and AUTH0_AUDIENCE in your .env file';
@@ -29,35 +26,21 @@ const checkJwt = jwt({
     cache: true,
     rateLimit: true,
     jwksRequestsPerMinute: 5,
-    jwksUri: `https://${process.env.AUTH0_DOMAIN}/.well-known/jwks.json`,
+    jwksUri: `https://${
+      process.env.AUTH0_DOMAIN || 'tictactoe1.us.auth0.com'
+    }/.well-known/jwks.json`,
   }),
 
   // Validate the audience and the issuer.
-  audience: process.env.AUTH0_AUDIENCE,
-  issuer: [`https://${process.env.AUTH0_DOMAIN}/`],
+  audience: process.env.AUTH0_AUDIENCE || 'tictactoe1.us.auth0.com',
+  issuer: [`https://${process.env.AUTH0_DOMAIN || 'localhost:3001/play'}/`],
   algorithms: ['RS256'],
-});
-
-const checkScopes = jwtAuthz(['read:messages']);
-
-app.get('/api/public', function (req, res) {
-  res.json({
-    message:
-      "Hello from a public endpoint! You don't need to be authenticated to see this.",
-  });
 });
 
 app.get('/api/private', checkJwt, function (req, res) {
   res.json({
     message:
       'Hello from a private endpoint! You need to be authenticated to see this.',
-  });
-});
-
-app.get('/api/private-scoped', checkJwt, checkScopes, function (req, res) {
-  res.json({
-    message:
-      'Hello from a private endpoint! You need to be authenticated and have a scope of read:messages to see this.',
   });
 });
 
@@ -75,11 +58,22 @@ const io = new Server(server, serverOptions);
 
 io.on('connection', (socket) => {
   console.log('A user connected');
-  socket.on('disconnect', () => {
-    console.log('A user disconnected');
+  socket.use(([event, ...args], next) => {
+    // Hook this up to Auth0 for authentication
+    /* if (isUnauthorized(event)) {
+         return next(new Error("unauthorized event"));
+       }*/
+       next();
   });
+
   socket.on('play:space', (payload) => registerMove(socket, payload));
-  socket.on('joined', (payload) => matchGame(socket, payload));
+  socket.on('joined', async (payload) => await matchGame(socket, payload));
+  socket.on('error', (err) => {
+    if (err && err.message === 'unauthorized event') {
+      socket.disconnect();
+    }
+  });
+  socket.on('disconnect', () => console.log('A user disconnected'));
 });
 
 const port = process.env.PORT || 3001;
@@ -91,4 +85,3 @@ console.log(`Listening on PORT: ${port}`);
 server.listen(socketPort, () => {
   console.log(`Socket listening on PORT: ${socketPort}`);
 });
-
